@@ -11,6 +11,13 @@ trait VarInstances extends VarInstances1 {
       final def pure[A](x: A): Var[A] = Var.value(x)
       final def flatMap[A, B](fa: Var[A])(f: A => Var[B]): Var[B] = fa.flatMap(f)
       override final def map[A, B](fa: Var[A])(f: A => B): Var[B] = fa.map(f)
+
+      override def tailRecM[A, B](a: A)(f: A => Var[Either[A, B]]): Var[B] =
+        Var.sample(f(a)) match {
+          case Left(aa) => tailRecM(aa)(f)
+          case Right(b) => Var.value(b)
+        }
+
     }
 
   implicit final def twitterVarSemigroup[A](implicit A: Semigroup[A]): Semigroup[Var[A]] =
@@ -40,14 +47,6 @@ trait VarInstances1 {
 
 private[util] abstract class VarCoflatMap extends CoflatMap[Var] {
   final def coflatMap[A, B](fa: Var[A])(f: Var[A] => B): Var[B] = Var(f(fa))
-
-  /**
-   * Note that this implementation is not stack-safe.
-   */
-  final def tailRecM[A, B](a: A)(f: A => Var[Either[A, B]]): Var[B] = f(a).flatMap {
-    case Left(a1) => tailRecM(a1)(f)
-    case Right(b) => Var.value(b)
-  }
 }
 
 private[util] class VarSemigroup[A](implicit A: Semigroup[A]) extends Semigroup[Var[A]] {
